@@ -132,56 +132,82 @@ def search_youtube_videos(query, CHANNEL_ID = "UCpAQimPOzeu_VRWRs_S4cPw"):
 
 	return results 
 
+
 # 🎨 Gradio UI with Tabs
-with gr.Blocks() as demo:
-    with gr.Tabs():  # ✅ Wrap all tabs inside gr.Tabs()
-        with gr.Tab("🗺️ Personalized Itinerary"):
-            gr.Markdown("## 🧭 Museum Itinerary Generator")
-            gr.Markdown("Fill in the details below to generate a custom visit plan for The Franklin Institute!")
+# Custom CSS for Helvetica font and orange theme
+css = """
+@import url('https://fonts.googleapis.com/css2?family=Helvetica+Neue:wght@400;700&display=swap');
 
-            with gr.Row():
-                age = gr.Number(label="Child's Age")
-                eta = gr.Textbox(label="Arrival Time (e.g. 10:00 AM)")
-                duration = gr.Textbox(label="Estimated Stay (e.g. 3 hours)")
+body, .gradio-container {
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+}
+button {
+    background: #FF6200
+}
+button:hover {
+    background: #FF8C42;
+}
+"""
 
-            interests = gr.Textbox(lines=3, label="Interests")
-            goals = gr.Textbox(lines=3, label="Learning Goals")
 
-            generate_btn = gr.Button("Generate Itinerary")
-            output = gr.Textbox(label="Suggested Itinerary", lines=10)
+def generate_itinerary(age, interests, arrival_time, duration, language, expectations):
+    itinerary = f"""
+    **Museum Itinerary for {age}-year-old:**
 
-            generate_btn.click(fn=generate_itinerary,
-                               inputs=[age, interests, goals, eta, duration],
-                               outputs=output)
+    ### 👶 Kid Information
+    - **Age:** {age}
+    - **Interests:** {", ".join(interests)}
 
-        with gr.Tab("🤖 Interactive Knowledge Companion"):
-            gr.Markdown("## 🤖 Real-Time Q&A")
+    ### 🕒 Visit Information
+    - **Arrival Time:** {arrival_time}:00 {'AM' if arrival_time < 12 else 'PM'}
+    - **Duration:** {duration}
+    - **Language Preference:** {language}
+    - **Other Expectations:** {expectations if expectations else "None"}
+    """
+    return itinerary
 
-            child_age = gr.Number(label="Child's Age", value=8)
-            question = gr.Textbox(label="Your Question", placeholder="Why is the sky blue?")
-            ask_btn = gr.Button("Ask")
-            answer_output = gr.Textbox(label="AI Answer", lines=5)
 
-            ask_btn.click(fn=answer_question,
-                          inputs=[child_age, question],
-                          outputs=answer_output)
-            
-        with gr.Tab("🎟️ Exit Ticket Generator"):
-            gr.Markdown("## 🎟️ Get Your Exit Ticket!")
-            gr.Markdown("Summarize your visit and take home fun learning prompts!")
+with gr.Blocks(title="Museum Itinerary Generator", css=css, theme=gr.themes.Default(primary_hue="orange")) as demo:
+    gr.Markdown("# 🏛️ Museum Itinerary Generator")
+    
+    # Kid Information Section
+    with gr.Group():
+        gr.Markdown("## 👶 Kid Information")
+        age = gr.Textbox(label="Age", placeholder="10")
+        interests = gr.CheckboxGroup(
+            label="What are the interested topics of your kids? (Select at least one)",
+            choices=["Space exploration", "Human biology", "Technology and innovation", 
+                    "Physics and mechanics", "Environmental science", "History of science"]
+        )
+    
+    # Visit Information Section
+    with gr.Group():
+        gr.Markdown("## 🕒 Visit Information")
+        arrival_time = gr.Slider(
+            label="Estimated arrive time",
+            minimum=9, maximum=17, step=1, value=12,
+            info="Drag to adjust between 9:00 and 17:00"
+        )
+        duration = gr.Radio(
+            label="Duration",
+            choices=["1 hour", "2 hours", "3 hours (recommended)", "4 hours", "> 4 hours"],
+            value="3 hours (recommended)"
+        )
+        language = gr.Radio(
+            label="Language preference",
+            choices=["English", "Spanish", "French", "Chinese", "Arabic"],
+            value="English"
+        )
+        expectations = gr.Textbox(
+            label="Other expectations (Optional)",
+            placeholder="E.g., wheelchair accessibility, quiet areas...",
+            lines=3
+        )
+    
+    gr.Button("Generate Itinerary", variant="primary").click(
+        fn=generate_itinerary,
+        inputs=[age, interests, arrival_time, duration, language, expectations],
+        outputs=gr.Markdown()
+    )
 
-            child_age = gr.Number(label="Child's Age", value=8)
-            exhibits_visited = gr.Textbox(label="Exhibits & Topics Explored", lines=3, placeholder="Space, Dinosaurs, Physics...")
-            favorite_part = gr.Textbox(label="Favorite Part of the Visit", placeholder="I loved the planetarium show!")
-
-            generate_ticket_btn = gr.Button("Generate Exit Ticket")
-            exit_ticket_output = gr.Textbox(label="Your Exit Ticket", lines=10)
-
-            gr.Markdown("### 📺 Suggested Learning Videos:")
-            video_output = gr.Textbox(label="Video Recommendations", lines=8)
-
-            generate_ticket_btn.click(fn=generate_exit_ticket,
-                                    inputs=[child_age, exhibits_visited, favorite_part],
-                                    outputs=[exit_ticket_output, video_output])
-
-demo.launch(share=False)
+demo.launch()
