@@ -2,9 +2,11 @@ import gradio as gr
 import openai
 from openai import OpenAI
 import os
-
+import requests
+import urllib.parse
 
 client = openai.OpenAI(api_key="YOUR_API_KEY")
+YOUTUBE_API_KEY = "YOUR_YT_API_KEY"
 
 
 # ✨ Itinerary Generator Logic
@@ -102,8 +104,33 @@ def generate_exit_ticket(age, exhibits, favorite_part):
     # 📺 Get 3 video recommendations from The Franklin Institute's YouTube channel based on the exhibits visited
     # https://www.youtube.com/@TheFranklinInstitutePHL/videos
     # search_youtube_videos() function to be defined: YOUTUBE_API_KEY
-    # def search_youtube_videos(query):
-        
+def search_youtube_videos(query, CHANNEL_ID = "UCpAQimPOzeu_VRWRs_S4cPw"):
+	"""
+	Searches YouTube videos from a specific channel based on a query
+	and returns the top 3 relevant videos.
+	"""
+	base_url = "https://www.googleapis.com/youtube/v3/search"
+	params = {
+		"key": YOUTUBE_API_KEY,
+		"channelId": CHANNEL_ID,
+		"part": "snippet",
+		"q": query,
+		"maxResults": 3,
+		"order": "relevance",
+		"type": "video"
+	}
+
+	response = requests.get(base_url, params=params)
+	data = response.json()
+
+	results = []
+	for item in data.get("items", []):
+		video_id = item["id"]["videoId"]
+		title = item["snippet"]["title"]
+		url = f"https://www.youtube.com/watch?v={video_id}"
+		results.append((title, url))
+
+	return results 
 
 # 🎨 Gradio UI with Tabs
 with gr.Blocks() as demo:
