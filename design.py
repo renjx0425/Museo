@@ -1,4 +1,5 @@
 import gradio as gr
+from app import generate_itinerary_response
 
 # Custom CSS for Helvetica font and orange theme
 css = """
@@ -14,23 +15,6 @@ button:hover {
     background: #FF8C42;
 }
 """
-
-
-def generate_itinerary(age, interests, arrival_time, duration, language, expectations):
-    itinerary = f"""
-    **Museum Itinerary for {age}-year-old:**
-
-    ### 👶 Kid Information
-    - **Age:** {age}
-    - **Interests:** {", ".join(interests)}
-
-    ### 🕒 Visit Information
-    - **Arrival Time:** {arrival_time}:00 {'AM' if arrival_time < 12 else 'PM'}
-    - **Duration:** {duration}
-    - **Language Preference:** {language}
-    - **Other Expectations:** {expectations if expectations else "None"}
-    """
-    return itinerary
 
 
 with gr.Blocks(title="Museum Itinerary Generator", css=css, theme=gr.themes.Default(primary_hue="orange")) as demo:
@@ -71,7 +55,7 @@ with gr.Blocks(title="Museum Itinerary Generator", css=css, theme=gr.themes.Defa
         )
     
     gr.Button("Generate Itinerary", variant="primary").click(
-        fn=generate_itinerary,
+        fn=generate_itinerary_response,
         inputs=[age, interests, arrival_time, duration, language, expectations],
         outputs=gr.Markdown()
     )
