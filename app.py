@@ -167,10 +167,10 @@ def generate_exit_ticket(age, exhibits, favorite_part):
     # 📺 Get 3 video recommendations from The Franklin Institute's YouTube channel based on the exhibits visited
     # https://www.youtube.com/@TheFranklinInstitutePHL/videos
     # search_youtube_videos() function to be defined: YOUTUBE_API_KEY
-def search_youtube_videos(query, CHANNEL_ID = "UCpAQimPOzeu_VRWRs_S4cPw"):
+def search_youtube_videos(query, CHANNEL_ID="UCpAQimPOzeu_VRWRs_S4cPw"):
 	"""
-	Searches YouTube videos from a specific channel based on a query
-	and returns the top 3 relevant videos.
+	Returns a list of top 3 videos from a YouTube channel based on a query.
+	Each entry includes: title, video_id
 	"""
 	base_url = "https://www.googleapis.com/youtube/v3/search"
 	params = {
@@ -190,10 +190,25 @@ def search_youtube_videos(query, CHANNEL_ID = "UCpAQimPOzeu_VRWRs_S4cPw"):
 	for item in data.get("items", []):
 		video_id = item["id"]["videoId"]
 		title = item["snippet"]["title"]
-		url = f"https://www.youtube.com/watch?v={video_id}"
-		results.append((title, url))
+		results.append((title, video_id))
 
-	return results 
+	return results
+
+def format_embedded_videos(video_data):
+	"""
+	Accepts a list of (title, video_id) and returns Markdown with embedded iframes.
+	"""
+	html = ""
+	for title, video_id in video_data:
+		html += f"""
+		### 🎥 {title}
+		<iframe width="100%" height="315"
+			src="https://www.youtube.com/embed/{video_id}"
+			title="{title}" frameborder="0"
+			allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+			allowfullscreen></iframe><br>
+		"""
+	return html
 
 
 # # 🎨 Gradio UI with Tabs
@@ -359,4 +374,17 @@ with gr.Blocks(title="Museum Itinerary Generator", css=css, theme=gr.themes.Defa
         inputs=[itinerary_output],
         outputs=audio_output
     )
+	
+    video_markdown = gr.HTML(visible=False)
+
+    def get_videos_and_display(query):
+        videos = search_youtube_videos(query)
+        return gr.update(value=format_embedded_videos(videos), visible=True)
+
+    gr.Button("🔎 Show Recommended Videos").click(
+        fn=get_videos_and_display,
+        inputs=[gr.Textbox(value="space", visible=False)],
+        outputs=video_markdown
+    )
+
 demo.launch()
