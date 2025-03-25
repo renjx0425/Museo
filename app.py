@@ -4,14 +4,61 @@ from openai import OpenAI
 import os
 import requests
 from dotenv import load_dotenv
+import asyncio
+from openai import AsyncOpenAI
 
 # Load environment variables from .env file
 load_dotenv()
 # Access the API key
 openai_api_key = os.getenv("OPENAI_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
+# Initialize OpenAI API client
 client = openai.OpenAI(api_key=openai_api_key)
-YOUTUBE_API_KEY = "YOUR_YT_API_KEY"
+async_client = AsyncOpenAI(api_key=openai_api_key)
+
+async def tts_itinerary(text, instructions, voice="nova"):
+	from aiohttp import ClientSession
+
+	output_path = "/tmp/itinerary.wav"
+
+	url = "https://api.openai.com/v1/audio/speech"
+	headers = {
+		"Authorization": f"Bearer {openai_api_key}",
+		"Content-Type": "application/json"
+	}
+	payload = {
+		"model": "gpt-4o-mini-tts",
+		"input": text,
+		"voice": voice,
+		"instructions": instructions,
+		"response_format": "wav"
+	}
+
+	async with ClientSession() as session:
+		async with session.post(url, headers=headers, json=payload) as resp:
+			if resp.status != 200:
+				error_text = await resp.text()
+				raise Exception(f"TTS failed: {resp.status} - {error_text}")
+			
+			with open(output_path, "wb") as f:
+				while True:
+					chunk = await resp.content.read(1024)
+					if not chunk:
+						break
+					f.write(chunk)
+
+	return output_path
+
+
+def sync_tts_wrapper(text):
+	instructions = (
+		"Voice: Friendly and enthusiastic, like a museum guide talking to kids. "
+		"Tone: Excited, informative, curious. Delivery: Clear and fun."
+	)
+	return asyncio.run(tts_itinerary(text, instructions))
+
+
 
 # ✨ Itinerary Generator Logic
 def generate_itinerary(age, interests, language, expectations, learning_goals, eta, estimated_staying_time):
@@ -287,10 +334,29 @@ with gr.Blocks(title="Museum Itinerary Generator", css=css, theme=gr.themes.Defa
             lines=3
         )
     
-    gr.Button("Generate Itinerary", variant="primary").click(
-        fn=generate_itinerary_response,
-        inputs=[age, interests, arrival_time, duration, language, expectations],
-        outputs=gr.Markdown()
+
+    itinerary_output = gr.Textbox(
+		label="🎟️ Your Personalized Museum Itinerary",
+		lines=20
+	)
+    audio_output = gr.Audio(label="🔊 Listen to Itinerary", type="filepath")
+
+    with gr.Row():
+        generate_btn = gr.Button("Generate Itinerary", variant="primary")
+        tts_btn = gr.Button("🔊 Play Audio", visible=False)
+
+    generate_btn.click(
+            fn=generate_itinerary_response,
+            inputs=[age, interests, arrival_time, duration, language, expectations],
+            outputs=itinerary_output
+        ).then(
+            fn=lambda: gr.update(visible=True),
+            outputs=tts_btn
     )
 
+    tts_btn.click(
+        fn=sync_tts_wrapper,
+        inputs=[itinerary_output],
+        outputs=audio_output
+    )
 demo.launch()
