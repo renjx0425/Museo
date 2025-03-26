@@ -119,17 +119,22 @@ def answer_question(age, question):
     system_prompt = (
         "You are an educational AI chatbot for MuseoGo, designed to answer questions from children visiting "
         "The Franklin Institute. Your answers must be:\n"
-        "- Age-appropriate (based on my child's age)\n"
-        "- Friendly and engaging\n"
-        "- Factually correct\n"
-        "- Easy to understand\n"
-        "- Related to science, exhibits, or museum topics\n"
-        "Make learning fun and inspire curiosity in my child."
+        "- Age-appropriate (based on the child's age)\n"
+        "- Friendly and engaging 😊\n"
+        "- Factually correct and easy to understand\n"
+        "- Focused on science, exhibits, or museum topics\n"
+        "- Designed to make learning fun and spark curiosity 🧠✨\n\n"
+        "SAFETY GUIDELINES:\n"
+        "- If the input includes hate speech, harmful content, or anything inappropriate, DO NOT answer the question.\n"
+        "- Instead, respond with a kind and firm message like: 'Let's keep things friendly and fun! 😊 I'm here to help with science questions and cool stuff about the museum. If you're curious about something science-y, I'm all ears!'\n"
+        "- Never repeat or acknowledge harmful content directly.\n\n"
+        "Use emojis where helpful to make your responses more fun and relatable.\n"
+        "Always end your answer with a simple multiple-choice question to check understanding."
     )
 
     user_prompt = (
         f"My child, age {age}, is visiting The Franklin Institute and asks: '{question}'\n\n"
-        "Please respond with a clear, fun explanation suitable for their age, and reference any relevant exhibit or concept."
+        "Please give a clear, fun explanation that matches their age level, and connect it to any related exhibit or science concept in the museum when possible."
     )
 
     response = client.chat.completions.create(
@@ -147,34 +152,62 @@ def answer_question(age, question):
 
 
 # ✨ Exit Ticket Generator Logic
+
 def generate_exit_ticket(age, exhibits, favorite_part):
-    # Handle both string and list inputs for exhibits
-    if isinstance(exhibits, str):
-        exhibits_list = [ex.strip() for ex in exhibits.split(",")]
-        exhibits_str = exhibits
-    elif isinstance(exhibits, list):
-        exhibits_list = [ex.strip() for ex in exhibits]
-        exhibits_str = ", ".join(exhibits)
-    else:
-        exhibits_list = []
-        exhibits_str = str(exhibits)
+    system_prompt = (
+        "You are an AI assistant creating personalized exit tickets for young visitors "
+        "at The Franklin Institute. Your goal is to reinforce learning by summarizing key takeaways "
+        "and providing engaging prompts for reflection. Keep the tone friendly, simple, and age-appropriate. "
+        "Use fun language to celebrate learning and encourage curiosity."
+    )
+
+    user_prompt = (
+        f"A {age}-year-old child visited The Franklin Institute and explored the following topics:\n"
+        f"{exhibits}\n\n"
+        f"Their favorite part of the visit was: {favorite_part}\n\n"
+        "Create a fun, engaging exit ticket that includes:\n"
+        "- A summary of what they learned (in simple language for their age).\n"
+        "- A playful reflection question.\n"
+        "- A suggested hands-on or creative activity they can try at home to keep learning."
+    )
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+    )
+    
+    return response.choices[0].message.content
+
+# def generate_exit_ticket(age, exhibits, favorite_part):
+#     # Handle both string and list inputs for exhibits
+#     if isinstance(exhibits, str):
+#         exhibits_list = [ex.strip() for ex in exhibits.split(",")]
+#         exhibits_str = exhibits
+#     elif isinstance(exhibits, list):
+#         exhibits_list = [ex.strip() for ex in exhibits]
+#         exhibits_str = ", ".join(exhibits)
+#     else:
+#         exhibits_list = []
+#         exhibits_str = str(exhibits)
 
     # Generate the exit ticket content
-    exit_ticket_content = f"""## What You Learned Today!
+#     exit_ticket_content = f"""## What You Learned Today!
 
-Hey there, future scientist! Today at The Franklin Institute, you explored {exhibits_str}. 
-Here's what you might have discovered:
+# Hey there, future scientist! Today at The Franklin Institute, you explored {exhibits_str}. 
+# Here's what you might have discovered:
 
-- {exhibits_list[0] if len(exhibits_list) > 0 else "Science"} is all about...
-{'- ' + exhibits_list[1] + ' which shows...' if len(exhibits_list) > 1 else ''}
+# - {exhibits_list[0] if len(exhibits_list) > 0 else "Science"} is all about...
+# {'- ' + exhibits_list[1] + ' which shows...' if len(exhibits_list) > 1 else ''}
 
-## Reflection Question
-What was the most surprising thing you learned about {favorite_part}?
+# ## Reflection Question
+# What was the most surprising thing you learned about {favorite_part}?
 
-## Keep Exploring at Home
-Try this fun activity: [simple activity related to {exhibits_list[0] if exhibits_list else 'science'}]
-"""
-    return exit_ticket_content
+# ## Keep Exploring at Home
+# Try this fun activity: [simple activity related to {exhibits_list[0] if exhibits_list else 'science'}]
+# """
+#     return exit_ticket_content
 
 def search_youtube_videos(query, CHANNEL_ID="UCpAQimPOzeu_VRWRs_S4cPw"):
     """
@@ -355,9 +388,9 @@ with gr.Blocks(title="Museum Experience", css=css) as demo:
                 fn=answer_question,
                 chatbot=chatbot,
                 examples=[
-                    "What can you tell me about this painting?",
-                    "Who was the artist?",
-                    "What period is this from?"
+                    "Why is the sky blue?",
+                    "What is a black hole?",
+                    "What makes a rainbow?"
                 ],
                 additional_inputs=None,
                 submit_btn=True,
