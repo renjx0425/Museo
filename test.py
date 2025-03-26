@@ -192,7 +192,7 @@ def generate_exit_ticket(age, exhibits, favorite_part):
 #         exhibits_list = []
 #         exhibits_str = str(exhibits)
 
-    # Generate the exit ticket content
+#     # Generate the exit ticket content
 #     exit_ticket_content = f"""## What You Learned Today!
 
 # Hey there, future scientist! Today at The Franklin Institute, you explored {exhibits_str}. 
@@ -246,18 +246,64 @@ def search_youtube_videos(query, CHANNEL_ID="UCpAQimPOzeu_VRWRs_S4cPw"):
 
 def format_embedded_videos(video_data):
 	"""
-	Accepts a list of (title, video_id) and returns Markdown with embedded iframes.
+	Accepts a list of (title, video_id) and returns HTML with videos
+	in a responsive grid layout that adapts to screen size.
 	"""
-	html = ""
+	if not video_data:
+		return ""
+
+	html = '''
+	<style>
+		.video-grid {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 20px;
+			justify-content: space-between;
+		}
+		.video-item {
+			flex: 1 1 45%;
+			min-width: 300px;
+		}
+		.video-container {
+			position: relative;
+			padding-bottom: 56.25%; /* 16:9 ratio */
+			height: 0;
+			overflow: hidden;
+		}
+		.video-container iframe {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			border: 0;
+		}
+		@media (max-width: 600px) {
+			.video-item {
+				flex: 1 1 100%;
+			}
+		}
+	</style>
+	<div class="video-grid">
+	'''
+
 	for title, video_id in video_data:
 		html += f"""
-		### 🎥 {title}
-		<iframe width="100%" height="315"
-			src="https://www.youtube.com/embed/{video_id}"
-			title="{title}" frameborder="0"
-			allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-			allowfullscreen></iframe><br>
+		<div class="video-item">
+			<h4>🎥 {title}</h4>
+			<div class="video-container">
+				<iframe
+					src="https://www.youtube.com/embed/{video_id}"
+					title="{title}"
+					allow="accelerometer; autoplay; clipboard-write;
+					encrypted-media; gyroscope; picture-in-picture"
+					allowfullscreen>
+				</iframe>
+			</div>
+		</div>
 		"""
+
+	html += '</div>'
 	return html
 
 
