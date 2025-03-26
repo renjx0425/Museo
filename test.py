@@ -4,66 +4,114 @@ from openai import OpenAI
 import os
 import requests
 from dotenv import load_dotenv
+import asyncio
+from openai import AsyncOpenAI
+import tempfile
 
 # Load environment variables from .env file
 load_dotenv()
 # Access the API key
 openai_api_key = os.getenv("OPENAI_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+
 
 client = openai.OpenAI(api_key=openai_api_key)
-YOUTUBE_API_KEY = "YOUR_YT_API_KEY"
+async_client = AsyncOpenAI(api_key=openai_api_key)
+
+
+async def tts_itinerary(text, instructions, voice="nova"):
+	from aiohttp import ClientSession
+
+	# Use Gradio-safe temp file
+	with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmpfile:
+		output_path = tmpfile.name
+
+	url = "https://api.openai.com/v1/audio/speech"
+	headers = {
+		"Authorization": f"Bearer {openai_api_key}",
+		"Content-Type": "application/json"
+	}
+	payload = {
+		"model": "gpt-4o-mini-tts",
+		"input": text,
+		"voice": voice,
+		"instructions": instructions,
+		"response_format": "wav"
+	}
+
+	async with ClientSession() as session:
+		async with session.post(url, headers=headers, json=payload) as resp:
+			if resp.status != 200:
+				error_text = await resp.text()
+				raise Exception(f"TTS failed: {resp.status} - {error_text}")
+
+			with open(output_path, "wb") as f:
+				while True:
+					chunk = await resp.content.read(1024)
+					if not chunk:
+						break
+					f.write(chunk)
+
+	return output_path
 
 
 
+def sync_tts_wrapper(text):
+	instructions = (
+		"Voice: Friendly and enthusiastic, like a museum guide talking to kids. "
+		"Tone: Excited, informative, curious. Delivery: Clear and fun."
+	)
+	return asyncio.run(tts_itinerary(text, instructions))
 
 # ✨ Itinerary Generator Logic
-def generate_itinerary(age, interests, language, expectations, learning_goals, eta, estimated_staying_time):
-    print(f"language is {language}")
+def generate_itinerary(age, interests, language, expectations,
+					   learning_goals, eta, estimated_staying_time):
+	print(f"language is {language}")
 
-    system_prompt = (
-        "You are an advanced AI working for MuseoGo, a platform dedicated to enhancing museum visits using AI. "
-        "You will speak in the language that the current user provides to you."
-        "Your main task is to create user-friendly itineraries specifically for The Franklin Institute, "
-        f"Ensure that the expected number of hours for the exhibits sums to {estimated_staying_time} and does not go over that. "
-        "factoring in user profiles (age, interests, learning goals, ETA, and estimated staying time). "
-        "Ensure your responses are accurate, thorough, and easy to understand."
-        "Be explicit about how your recommendation matches my child's interests, age, and learning goals."
-        "Provide complete, detailed recommendations for exhibits and scheduling, integrating daily show times."
-        # "Clearly restate the child's age, interests, learning goals."
-        "You are displaying this directly to the user, don't exclaim in response to the prompt."
-        "Don't use the word I and instead use second person. Directly address your users. Don't respond to me with \"Certainly\"." 
-    )
-    
-    user_prompt = (
-        f"I am planning a trip to The Franklin Institute with my child.\n\n"
-        f"Child's Age: {age}\n"
-        f"Interests: {interests}\n"
-        f"Learning Goals: {learning_goals}\n"
-        f"Arrival Time (ETA): {eta}\n"
-        f"Estimated Staying Time: {estimated_staying_time}\n\n"
-        f"Keep in mind my child's conditions: {expectations}\n\n"
-        "Generate a personalized museum itinerary tailored to this information. "
-        "Include:\n"
-        "- Recommended exhibits in order, including why you chose each exhibit.\n"
-        "- Time estimates for each exhibit.\n"
-        "- Integration of daily show schedules.\n"
-        "- Any additional tips to maximize their visit.\n\n"
-        f"Please respond to me in {language} for the rest of the conversation.\n"
-        "Always format your answer as:\n"
-        "\"Number. Title - explanation\"\n"
-    )
+	system_prompt = (
+		"You are an advanced AI working for MuseoGo, a platform dedicated to enhancing museum visits using AI. "
+		"You will speak in the language that the current user provides to you."
+		"Your main task is to create user-friendly itineraries specifically for The Franklin Institute, "
+		f"Ensure that the expected number of hours for the exhibits sums to {estimated_staying_time} and does not go over that. "
+		"factoring in user profiles (age, interests, learning goals, ETA, and estimated staying time). "
+		"Ensure your responses are accurate, thorough, and easy to understand."
+		"Be explicit about how your recommendation matches my child's interests, age, and learning goals."
+		"Provide complete, detailed recommendations for exhibits and scheduling, integrating daily show times."
+		"You are displaying this directly to the user, don't exclaim in response to the prompt."
+		"Don't use the word I and instead use second person. Directly address your users. Don't respond to me with \"Certainly\"."
+	)
 
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",  # or "gpt-4" if you're on free tier
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
-    
-    return response.choices[0].message.content
+	user_prompt = (
+		f"I am planning a trip to The Franklin Institute with my child.\n\n"
+		f"Child's Age: {age}\n"
+		f"Interests: {interests}\n"
+		f"Learning Goals: {learning_goals}\n"
+		f"Arrival Time (ETA): {eta}\n"
+		f"Estimated Staying Time: {estimated_staying_time}\n\n"
+		f"Keep in mind my child's conditions: {expectations}\n\n"
+		"Generate a personalized museum itinerary tailored to this information. "
+		"Include:\n"
+		"- Recommended exhibits in order, including why you chose each exhibit.\n"
+		"- Time estimates for each exhibit.\n"
+		"- Integration of daily show schedules.\n"
+		"- Any additional tips to maximize their visit.\n\n"
+		f"Please respond to me in {language} for the rest of the conversation.\n"
+		"Always format your answer as:\n"
+		"\"Number. Title - explanation\"\n"
+	)
 
+	response = client.chat.completions.create(
+		model="gpt-3.5-turbo",
+		messages=[
+			{"role": "system", "content": system_prompt},
+			{"role": "user", "content": user_prompt}
+		]
+	)
 
+	itinerary = response.choices[0].message.content
+	audio_path = sync_tts_wrapper(itinerary)
+
+	return itinerary, gr.update(value=audio_path, visible=True)
 
 
 # ✨ Knowledge Companion Logic
@@ -153,45 +201,82 @@ def search_youtube_videos(query, CHANNEL_ID="UCpAQimPOzeu_VRWRs_S4cPw"):
         for item in data.get("items", []):
             video_id = item["id"]["videoId"]
             title = item["snippet"]["title"]
-            url = f"https://www.youtube.com/watch?v={video_id}"
-            results.append((title, url))
+            # url = f"https://www.youtube.com/watch?v={video_id}"
+            results.append((title, video_id))
 
         return results
     except Exception as e:
         print(f"Error searching YouTube videos: {e}")
         return []
 
+
+
+def format_embedded_videos(video_data):
+	"""
+	Accepts a list of (title, video_id) and returns Markdown with embedded iframes.
+	"""
+	html = ""
+	for title, video_id in video_data:
+		html += f"""
+		### 🎥 {title}
+		<iframe width="100%" height="315"
+			src="https://www.youtube.com/embed/{video_id}"
+			title="{title}" frameborder="0"
+			allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+			allowfullscreen></iframe><br>
+		"""
+	return html
+
+
 def create_exit_ticket(age, exhibits, favorite_part):
-    # Generate the exit ticket content - pass exhibits as-is
-    exit_ticket = generate_exit_ticket(age, exhibits, favorite_part)
-    
-    # Get exhibits as a list (handles both string and list inputs)
-    exhibits_list = [ex.strip() for ex in (exhibits.split(",") if isinstance(exhibits, str) else exhibits)]
-    
-    # Video recommendations
-    video_recommendations = "\n\n## Recommended Videos from The Franklin Institute\n"
-    video_urls = []
-    
-    for i, exhibit in enumerate(exhibits_list[:3]):  # Limit to 3 exhibits
-        videos = search_youtube_videos(exhibit)
-        if videos:
-            if i < 2:  # Only include in markdown for first 2 exhibits
-                video_recommendations += f"\n### About {exhibit}:\n"
-                for j, (title, url) in enumerate(videos[:2], 1):  # Limit to 2 videos per exhibit
-                    video_recommendations += f"{j}. [{title}]({url})\n"
-            video_urls.append(videos[0][1])  # Take first video URL
-    
-    # Pad with None if we don't have enough videos
-    while len(video_urls) < 3:
-        video_urls.append(None)
-    
-    # Combine the content
-    full_exit_ticket = exit_ticket + video_recommendations
-    
-    return full_exit_ticket, video_urls[0], video_urls[1], video_urls[2]
+	# Generate the exit ticket content - plain text
+	exit_ticket_text = generate_exit_ticket(age, exhibits, favorite_part)
+
+	# Format the text into HTML-friendly format (replace newlines with <br>)
+	formatted_text = exit_ticket_text.replace('\n', '<br>')
+
+	# Wrap the content in a styled HTML container
+	exit_ticket_html = f"""
+	<div style="font-family: Arial, sans-serif; line-height: 1.6;">
+		<h2>🧾 Your Personalized Exit Ticket</h2>
+		<p>{formatted_text}</p>
+	</div>
+	"""
+
+	# Get exhibits as a list
+	exhibits_list = [
+		ex.strip() for ex in
+		(exhibits.split(",") if isinstance(exhibits, str) else exhibits)
+	]
+
+	# Prepare embedded video section
+	video_section = """
+	<div style="margin-top: 40px;">
+		<h2>🎬 Recommended Videos from The Franklin Institute</h2>
+	"""
+	video_urls = []
+
+	for i, exhibit in enumerate(exhibits_list[:3]):  # Limit to 3 exhibits
+		videos = search_youtube_videos(exhibit)
+		if videos:
+			if i < 2:  # Only embed for first 2 exhibits
+				video_section += f"<h3>About {exhibit}:</h3>"
+				video_section += format_embedded_videos(videos[:2])
+			video_urls.append(videos[0][1])  # Store first video ID
+
+	# Pad with None if fewer than 3
+	while len(video_urls) < 3:
+		video_urls.append(None)
+
+	video_section += "</div>"
+
+	# Combine all content
+	full_exit_ticket = exit_ticket_html + video_section
+
+	return full_exit_ticket, video_urls[0], video_urls[1], video_urls[2]
 
 
-### Gradio Interface
+## Gradio Interface
 css = """
 @import url('https://fonts.googleapis.com/css2?family=Helvetica+Neue:wght@400;700&display=swap');
 
@@ -246,12 +331,14 @@ with gr.Blocks(title="Museum Experience", css=css) as demo:
                 )
                     
                 itinerary_output = gr.Markdown()
+                tts_audio_output = gr.Audio(label="🎧 Listen to Itinerary", visible=False)
+
                 generate_btn = gr.Button("Generate Itinerary", variant="primary")
                 generate_btn.click(
                     fn=generate_itinerary,
                     inputs=[age, interests, language, expectations, learning_goals, eta, estimated_staying_time],
-                    outputs=itinerary_output
-                    )
+                    outputs=[itinerary_output, tts_audio_output]
+                )
             
         
         with gr.Tab("Learning Companion", id=1):
@@ -276,7 +363,7 @@ with gr.Blocks(title="Museum Experience", css=css) as demo:
                 submit_btn=True,
                 fill_height=True
             )
-            
+
 
         with gr.Tab("Exit Ticket Generator", id=2):
             gr.Markdown("# 🏛️ Franklin Institute Exit Ticket Generator")
@@ -296,7 +383,7 @@ with gr.Blocks(title="Museum Experience", css=css) as demo:
             generate_btn = gr.Button("Generate Exit Ticket", variant="primary")
             
             with gr.Row():
-                exit_ticket_output = gr.Markdown(label="Your Personalized Exit Ticket")
+                exit_ticket_output = gr.HTML(label="Your Personalized Exit Ticket")
                 video_outputs = []
                 for i in range(3):
                     video_outputs.append(gr.Video(label=f"Recommended Video {i+1}", visible=False))
